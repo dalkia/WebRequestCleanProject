@@ -141,11 +141,6 @@ public class WebRequestExecutioner : MonoBehaviour
                 catch (UnityWebRequestException exception)
                 {
                     Debug.LogError($"Request threw exception for {requestEnvelope.WebRequestType}: {exception.Message}");
-                    if (exception.Message.Contains("Cannot connect"))
-                    {
-                        Debug.Log($"JUANI {requestEnvelope.CommonArguments.URL.Value}");
-
-                    }
                 }
             }
         }
