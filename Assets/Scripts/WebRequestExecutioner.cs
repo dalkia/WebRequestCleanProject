@@ -44,17 +44,51 @@ public class Args
 public class WebRequestExecutioner : MonoBehaviour
 {
     public TextAsset recordedWebRequests;
-
-    public CancellationTokenSource cts;
+    public int timesToRepeat = 1;
     
     private int maxConcurrentRequests = 20; // Maximum number of concurrent requests
     private SemaphoreSlim semaphore;
+    private List<byte[]> memoryChunks;
+    private CancellationTokenSource cts;
+
+    private int totalRequestsCompleted;
+    private int totalRequestsFailed;
+    private int totalRequestsFinishedWithExceptions;
+
+
     private void Start()
     {
         var requestEnvelopes = BuildRequestEnvelopeList();
 
+        AllocateMemory(20);
         CountWebRequests(requestEnvelopes);
-        ProcessRequests(requestEnvelopes).Forget();
+        StartRequests(requestEnvelopes);
+    }
+
+    private async void StartRequests(List<RequestEnvelope> requestEnvelopes)
+    {
+        for (int i = 0; i < timesToRepeat; i++)
+            await ProcessRequests(requestEnvelopes);
+        
+        Debug.Log($"TOTAL REQUESTS COMPLETED {totalRequestsCompleted}");
+        Debug.Log($"TOTAL REQUESTS FAILED {totalRequestsFailed}");
+        Debug.Log($"TOTAL REQUESTS WITH EXCEPTIONS {totalRequestsFinishedWithExceptions}");
+
+    }
+
+    // Method to allocate a specified amount of memory (in GB)
+    public void AllocateMemory(float gigabytes)
+    {
+        int chunkSize = 100 * 1024 * 1024; // 100 MB per chunk
+        int totalChunks = (int)(gigabytes * 1024 / 100); // gigabytes / 100 MB per chunk
+        memoryChunks = new List<byte[]>();
+        for (int i = 0; i < totalChunks; i++)
+        {
+            // Allocate 100 MB chunks and add to list
+            memoryChunks.Add(new byte[chunkSize]);
+        }
+
+        Debug.Log($"Memory allocation complete. {gigabytes} GB allocated.");
     }
 
     private void OnDestroy()
@@ -63,7 +97,7 @@ public class WebRequestExecutioner : MonoBehaviour
     }
     
     // Method to process all requests asynchronously
-    private async UniTaskVoid ProcessRequests(List<RequestEnvelope> requestEnvelopes)
+    private async UniTask ProcessRequests(List<RequestEnvelope> requestEnvelopes)
     {
         semaphore = new SemaphoreSlim(maxConcurrentRequests);
         cts = new CancellationTokenSource();
@@ -132,15 +166,18 @@ public class WebRequestExecutioner : MonoBehaviour
                     if (response.result == UnityWebRequest.Result.Success)
                     {
                         Debug.Log($"Request completed successfully for {requestEnvelope.WebRequestType}");
+                        totalRequestsCompleted++;
                     }
                     else
                     {
                         Debug.LogError($"Request failed for {requestEnvelope.WebRequestType}: {response.error}");
+                        totalRequestsFailed++;
                     }
                 }
                 catch (UnityWebRequestException exception)
                 {
                     Debug.LogError($"Request threw exception for {requestEnvelope.WebRequestType}: {exception.Message}");
+                    totalRequestsFinishedWithExceptions++;
                 }
             }
         }
